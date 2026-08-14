@@ -1,0 +1,9 @@
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'silent';
+process.env.AUTH_ISSUER_URL = 'https://securetoken.google.com/test-project';
+process.env.FIREBASE_PROJECT_ID = 'test-project';
+process.env.AUTH_DISABLED = 'true';
+process.env.OSRM_URL = 'http://osrm.test:5000';
+process.env.DEFAULT_PROFILE = 'motorcycle';
+process.env.PARAM_OVERVIEW = 'full';
+process.env.PARAM_GEOMETRIES = 'geojson';

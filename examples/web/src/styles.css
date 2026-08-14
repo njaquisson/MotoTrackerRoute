@@ -1,0 +1,164 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  --bg: #101114;
+  --panel: #17181d;
+  --line: #2a2c34;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  height: 100%;
+}
+
+.panel {
+  padding: 24px 22px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 28px;
+}
+
+.lede,
+.hint {
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 16px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #101114;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 650;
+  background: var(--accent);
+  color: #111;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.banner {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.banner.error {
+  background: #3f1d1d;
+  color: #fecaca;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.stats div {
+  background: #101114;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+dd {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stats small {
+  color: var(--muted);
+}
+
+.map-wrap,
+.map {
+  height: 100%;
+  width: 100%;
+  min-height: 320px;
+}
+
+.leaflet-container {
+  background: #1f2937;
+  font-family: inherit;
+}
+
+code {
+  font-size: 0.92em;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 55vh;
+  }
+
+  .panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

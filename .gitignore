@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+.env
+data/
+*.log
+.DS_Store
+.osrm*
+*.osrm*
+osrm/data/
+
+# Secrets / credentials — never commit
+*.pem
+*.key
+*.p12
+*.jks
+*.pfx
+*.crt
+*.cer
+*service-account*.json
+*firebase-adminsdk*.json
+*.secret
+*.token
+.env.*
+!.env.example
