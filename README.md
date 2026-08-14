@@ -20,7 +20,7 @@ O motor de roteamento roda localmente (Docker), o que garante privacidade dos da
 | Auth | Firebase Auth — JWT RS256 via JWKS (`jose`) |
 | Rate limit | `@fastify/rate-limit` (por `uid`, fallback IP) |
 | Motor de rota | `osrm/osrm-backend` + perfil `osrm/profiles/motorcycle.lua` |
-| Mapa | Brasil (Geofabrik, ~1,9 GB — configurável via `OSRM_EXTRACT`) |
+| Mapa | Brasil (Geofabrik, PBF ~2 GB + grafo ~16 GB — configurável via `OSRM_EXTRACT`) |
 | Testes | Vitest (unitário + integração) |
 | Infra | Docker Compose + multi-stage Dockerfile |
 
@@ -47,7 +47,7 @@ O motor de roteamento roda localmente (Docker), o que garante privacidade dos da
 └──────────────────────────────────────────────┘
 ```
 
-> Porta da API configurável via `PORT` (default `3000`; dev/testes usa `8888`).
+> Porta da API configurável via `PORT` (default `3000`; o compose e os exemplos usam `8888`, já que `3000` costuma estar ocupado por outro serviço).
 
 ## Pré-requisitos (Linux)
 
@@ -66,7 +66,7 @@ docker --version
 docker compose version
 ```
 
-> A primeira preparação do grafo do **Brasil** baixa ~1,9 GB (Geofabrik `brazil-latest.osm.pbf`) e exige **~20 GB de RAM** por ~1–2 h. Os dados ficam em `OSRM_DATA_DIR` (bind mount no host — veja abaixo) e são reutilizados nas execuções seguintes.
+> A primeira preparação do grafo do **Brasil** baixa **~2 GB** (Geofabrik `brazil-latest.osm.pbf`) e gera **~16 GB** de grafo `.osrm` — **~18 GB no total** — exigindo **~20 GB de RAM** e **1–2 h**. Os dados ficam em `OSRM_DATA_DIR` (bind mount no host) e são reutilizados nas execuções seguintes — veja [Dados do mapa (PBF + grafo OSRM)](#dados-do-mapa-pbf--grafo-osrm).
 
 ## Instalação
 
@@ -93,14 +93,16 @@ FIREBASE_PROJECT_ID=<SEU_PROJECT_ID>
 
 ### Opção A — Stack completa com Docker (mais simples)
 
-Sobe **API + OSRM** juntos. A API compila e roda dentro do container:
+Sobe **API + OSRM** juntos. A API compila e roda dentro do container. Na **primeira vez**, o compose baixa o PBF e prepara o grafo antes de subir o servidor — **demora de 1 a 2 h** (veja [Dados do mapa (PBF + grafo OSRM)](#dados-do-mapa-pbf--grafo-osrm)):
 
 ```bash
-docker compose up --build
+docker compose up -d --build
+docker compose logs -f osrm-prepare   # acompanha download + extração
+docker compose ps                      # aguarde osrm "Up (healthy)"
 ```
 
-- API: `http://localhost:3000`
-- Health check: `curl http://localhost:3000/health`
+- API: `http://localhost:8888`
+- Health check: `curl http://localhost:8888/health`
 - OSRM: `http://127.0.0.1:5000` (publicado **apenas** em localhost, rede interna)
 
 ### Opção B — API local + OSRM no Docker (desenvolvimento)
@@ -113,6 +115,8 @@ docker compose up osrm
 npm run dev
 ```
 
+> Na 1ª vez, `docker compose up osrm` **baixa o PBF e prepara o grafo** (1–2 h); nas demais, sobe o servidor em segundos.
+
 ### Sem Firebase (desenvolvimento/testes)
 
 No `.env`:
@@ -122,6 +126,72 @@ AUTH_DISABLED=true
 ```
 
 Com isso, todas as rotas ficam abertas e o rate limit passa a usar o **IP** como chave (em vez do `uid`). A flag é **recusada em produção**: com `NODE_ENV=production`, o servidor não sobe com `AUTH_DISABLED=true`.
+
+## Dados do mapa (PBF + grafo OSRM)
+
+O motor de rota consome dois conjuntos de arquivos, todos dentro de `OSRM_DATA_DIR`:
+
+| Conjunto | Arquivo(s) | Tamanho (Brasil) | Produzido por |
+| --- | --- | --- | --- |
+| Mapa bruto | `brazil-latest.osm.pbf` | **~2 GB** | `osrm-download` (Geofabrik) |
+| Grafo de rota | `brazil-latest.osrm*` (~27 arquivos) | **~16 GB** | `osrm-prepare` |
+| **Total** | | **~18 GB** | |
+
+### Onde salvar
+
+Defina `OSRM_DATA_DIR` no `.env` apontando para um disco com **pelo menos ~20 GB livres** — de preferência um HD/SSD grande de dados, **não o disco do sistema**:
+
+```env
+OSRM_DATA_DIR=/media/SEU_USUARIO/Dados/mapa-data
+```
+
+Como é um **bind mount** no host, os arquivos **não** são apagados por `docker compose down -v` — só com `rm` manual.
+
+### Primeira execução
+
+1. Configure `OSRM_DATA_DIR` (e, se quiser outra região, `OSRM_EXTRACT` + `OSRM_PBF_URL`) no `.env`.
+2. Suba a stack. Na primeira vez o compose **baixa ~2 GB e processa o grafo (~16 GB)** — leva **1–2 h** e usa **~20 GB de RAM**:
+
+   ```bash
+   docker compose up -d --build
+   docker compose logs -f osrm-prepare
+   ```
+
+3. Aguarde a preparação terminar e confira:
+
+   ```bash
+   docker compose ps                      # osrm: "Up (healthy)"
+   curl "http://127.0.0.1:5000/route/v1/motorcycle/-46.6333,-23.5505;-43.1964,-22.9068?overview=false"
+   ```
+
+> **Docker Desktop:** se a preparação morrer com `Killed` (OOM), aumente a memória da VM para **≥ 24 GB** (Settings → Resources → Memory) e rode o `osrm-prepare` de novo — o PBF já baixado **não é re-baixado** e o processamento retoma de onde parou.
+
+### Execuções seguintes (mapa já preparado)
+
+Os serviços `osrm-download` e `osrm-prepare` detectam o PBF/grafo existentes e **saem imediatamente**; apenas o servidor sobe:
+
+```bash
+docker compose up -d osrm api
+docker compose ps     # osrm "Up (healthy)"
+```
+
+### Atualizar o mapa
+
+A Geofabrik atualiza o extrato do Brasil **diariamente**, mas para roteamento de moto **atualizar mensalmente** é um bom equilíbrio (mapa recente sem reprocessar toda semana):
+
+```bash
+# 1. Apagar o mapa atual (PBF + grafo)
+rm -rf "${OSRM_DATA_DIR}"/brazil-latest.osm.pbf "${OSRM_DATA_DIR}"/brazil-latest.osrm*
+
+# 2. Rebaixar e reprocessar (mesma "primeira execução", ~18 GB e 1–2 h)
+docker compose up -d --build
+docker compose logs -f osrm-prepare
+
+# 3. Recarregar o grafo novo no servidor
+docker compose up -d --force-recreate osrm
+```
+
+> **Dica (Docker Desktop):** se o `osrm-routed` reclamar de arquivos "Missing/Broken" logo após uma preparação, recrie o container para montar o grafo novo: `docker compose up -d --force-recreate osrm`.
 
 ## Variáveis de ambiente
 

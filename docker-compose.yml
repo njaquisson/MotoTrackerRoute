@@ -42,8 +42,15 @@ services:
 
         echo "Criando um perfil de moto confiavel a partir do oficial..."
         mkdir -p $$PROFILE_DIR
-        # Copia todos os perfis e bibliotecas nativas do OSRM para o volume
-        cp -r /opt/* $$PROFILE_DIR/
+        # O compartilhamento FUSE do Docker Desktop pode nao estar pronto no
+        # instante em que este container inicia; tenta a copia com retry.
+        for i in 1 2 3 4 5; do
+          if cp -r /opt/* $$PROFILE_DIR/; then
+            break
+          fi
+          echo "Falha ao copiar perfis (tentativa $$i/5), aguardando 3s..."
+          sleep 3
+        done
         # Cria o motorcycle.lua a partir do car.lua oficial
         mv $$PROFILE_DIR/car.lua $$PROFILE
 
@@ -82,10 +89,11 @@ services:
         condition: service_started
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:8888:8888"
     env_file:
       - .env
     environment:
       HOST: 0.0.0.0
+      PORT: 8888
       OSRM_URL: http://osrm:5000
       DEFAULT_PROFILE: motorcycle
