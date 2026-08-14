@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
-import { fetchRoute } from '../api';
+import { fetchRoute, login, signup } from '../api';
 import { formatDistance, formatDuration, parseCoordinatePair, routePoints } from '../geo';
 import type { LatLngTuple, RouteResponse } from '../types';
 
@@ -26,9 +26,59 @@ export function MapComponent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authUid, setAuthUid] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState<null | 'create' | 'login'>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
+
   const points = useMemo(() => (route ? routePoints(route) : []), [route]);
   const originPoint = parseCoordinatePair(origin);
   const destinationPoint = parseCoordinatePair(destination);
+
+  function validateAuthFields(): boolean {
+    if (!email.trim() || !password) {
+      setAuthError('Informe usuário e senha.');
+      return false;
+    }
+    return true;
+  }
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+    setAuthInfo(null);
+    if (!validateAuthFields()) return;
+
+    setAuthLoading('create');
+    try {
+      await signup(email.trim(), password);
+      setAuthInfo('Conta criada! Agora clique em Autenticar.');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Falha ao criar conta');
+    } finally {
+      setAuthLoading(null);
+    }
+  }
+
+  async function handleLogin() {
+    setAuthError(null);
+    setAuthInfo(null);
+    if (!validateAuthFields()) return;
+
+    setAuthLoading('login');
+    try {
+      const result = await login(email.trim(), password);
+      setAuthToken(result.token);
+      setAuthUid(result.uid);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Falha ao autenticar');
+    } finally {
+      setAuthLoading(null);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,10 +88,14 @@ export function MapComponent() {
       setError('Use o formato lat,lng (ex.: -29.7608,-50.0200)');
       return;
     }
+    if (!authToken) {
+      setError('Autentique-se antes de gerar a rota.');
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await fetchRoute(origin.trim(), destination.trim());
+      const result = await fetchRoute(origin.trim(), destination.trim(), authToken);
       setRoute(result);
     } catch (err) {
       setRoute(null);
@@ -57,9 +111,49 @@ export function MapComponent() {
         <p className="eyebrow">MotoTracker</p>
         <h1>Teste de rota</h1>
         <p className="lede">
-          Origem e destino em <code>lat,lng</code>. A geometria GeoJSON é convertida para o Leaflet
-          antes de desenhar a linha.
+          Primeiro crie a conta, depois autentique e só então gere a rota. Origem e destino em{' '}
+          <code>lat,lng</code>.
         </p>
+
+        <form className="form" onSubmit={handleCreate}>
+          <label>
+            Usuário (email)
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="rider@example.com"
+              autoComplete="username"
+              spellCheck={false}
+            />
+          </label>
+          <label>
+            Senha
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+          </label>
+          <div className="button-row">
+            <button type="submit" disabled={authLoading !== null}>
+              {authLoading === 'create' ? 'Criando…' : 'Criar'}
+            </button>
+            <button type="button" className="secondary" onClick={handleLogin} disabled={authLoading !== null}>
+              {authLoading === 'login' ? 'Autenticando…' : 'Autenticar'}
+            </button>
+          </div>
+        </form>
+
+        {authError && <p className="banner error">{authError}</p>}
+        {authInfo && <p className="banner success">{authInfo}</p>}
+        {authToken && (
+          <p className="banner success">
+            Autenticado{authUid ? ` (uid: ${authUid})` : ''}
+          </p>
+        )}
 
         <form className="form" onSubmit={handleSubmit}>
           <label>
@@ -82,7 +176,7 @@ export function MapComponent() {
               spellCheck={false}
             />
           </label>
-          <button type="submit" disabled={loading}>
+          <button type="submit" disabled={loading || !authToken}>
             {loading ? 'Calculando…' : 'Gerar Rota'}
           </button>
         </form>
@@ -105,8 +199,8 @@ export function MapComponent() {
         )}
 
         <p className="hint">
-          Padrão: Capão da Canoa → Porto Alegre. A API precisa estar em{' '}
-          <code>:8888</code> (o Vite faz o proxy de <code>/api</code>).
+          Padrão: Capão da Canoa → Porto Alegre. Crie a conta, autentique-se e depois gere a rota.
+          A API precisa estar em <code>:8888</code> (o Vite faz o proxy de <code>/api</code>).
         </p>
       </aside>
 

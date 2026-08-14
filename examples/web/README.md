@@ -33,10 +33,10 @@ A API e o frontend rodam em **paralelo**, em terminais separados.
 A API precisa estar acessível em `http://127.0.0.1:8888` (padrão esperado pelo proxy do Vite). Na raiz do repositório:
 
 ```bash
-AUTH_DISABLED=true PORT=8888 npm run dev
+AUTH_DISABLED=false PORT=8888 npm run dev
 ```
 
-> `AUTH_DISABLED=true` desativa o JWT — o frontend não envia `Authorization`. Para testar com autenticação real, ajuste o proxy para a porta da API e adicione o token no cliente.
+> `AUTH_DISABLED=false` ativa o JWT — o frontend envia o token obtido no login (`Authorization: Bearer`).
 
 ### 2. Frontend na porta `5173`
 
@@ -65,10 +65,14 @@ API_PROXY_TARGET=http://127.0.0.1:9999 node ./node_modules/vite/bin/vite.js
 
 ## Uso
 
-1. Preencha **Origem** e **Destino** no formato `lat,lng` (ex.: `-30.0346,-51.2177`).
-2. Clique em **Gerar Rota**.
-3. O painel exibe **distância** e **duração**; a geometria `LineString` é desenhada no mapa (com auto-zoom).
-4. Padrão inicial: Capão da Canoa → Porto Alegre.
+O fluxo de autenticação tem 3 passos obrigatórios:
+
+1. Preencha **Usuário (email)** e **Senha**.
+2. Clique em **Criar** — cria a conta na API (`POST /api/v1/auth/signup`).
+3. Clique em **Autenticar** — obtém o ID token (`POST /api/v1/auth/login`); o painel mostra "Autenticado (uid: ...)".
+4. Preencha **Origem** e **Destino** no formato `lat,lng` (ex.: `-30.0346,-51.2177`) e clique em **Gerar Rota** (só fica habilitado após autenticar).
+5. O painel exibe **distância** e **duração**; a geometria `LineString` é desenhada no mapa (com auto-zoom).
+6. Padrão inicial: Capão da Canoa → Porto Alegre.
 
 > **Coordenadas:** a API retorna GeoJSON no formato `[lng, lat]`. O frontend converte para `[lat, lng]` (esperado pelo Leaflet) em `src/geo.ts` antes de desenhar.
 
@@ -95,7 +99,7 @@ examples/web/
 └── src/
     ├── main.tsx              # bootstrap React
     ├── App.tsx
-    ├── api.ts                # cliente do GET /api/v1/route
+    ├── api.ts                # cliente: signup, login e GET /api/v1/route
     ├── geo.ts                # [lng,lat] → [lat,lng], formatação de distância/duração
     ├── types.ts              # contratos da resposta
     └── components/

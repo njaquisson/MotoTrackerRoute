@@ -94,6 +94,18 @@ button:disabled {
   cursor: wait;
 }
 
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .banner {
   border-radius: 10px;
   padding: 10px 12px;
@@ -103,6 +115,11 @@ button:disabled {
 .banner.error {
   background: #3f1d1d;
   color: #fecaca;
+}
+
+.banner.success {
+  background: #14371f;
+  color: #bbf7d0;
 }
 
 .stats {

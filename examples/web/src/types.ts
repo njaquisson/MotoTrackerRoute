@@ -7,6 +7,13 @@ export interface RouteResponse {
   };
 }
 
+export interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresIn: string;
+  uid: string;
+}
+
 export interface ApiErrorBody {
   error?: string;
   code?: string;
