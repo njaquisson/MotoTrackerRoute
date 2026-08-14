@@ -18,6 +18,7 @@ const envSchema = z.object({
 
   AUTH_ISSUER_URL: z.string().url(),
   FIREBASE_PROJECT_ID: z.string().min(1).optional(),
+  FIREBASE_API_KEY: z.string().min(1),
   AUTH_DISABLED: z
     .enum(['true', 'false', '1', '0'])
     .default('false')
@@ -48,6 +49,11 @@ function resolveFirebaseProjectId(raw: z.infer<typeof envSchema>): string {
 
 export function loadEnv(overrides: Record<string, string | undefined> = {}): AppEnv {
   const parsed = envSchema.parse({ ...process.env, ...overrides });
+
+  if (parsed.NODE_ENV === 'production' && parsed.AUTH_DISABLED) {
+    throw new Error('AUTH_DISABLED cannot be enabled when NODE_ENV is production');
+  }
+
   return {
     ...parsed,
     FIREBASE_PROJECT_ID: resolveFirebaseProjectId(parsed),

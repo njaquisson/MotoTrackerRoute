@@ -104,4 +104,29 @@ describe('GET /api/v1/route', () => {
     expect(res.statusCode).toBe(401);
     expect(res.json().code).toBe('INVALID_TOKEN');
   });
+
+  it('rate limits per IP when auth is disabled', async () => {
+    app = await buildApp({
+      env: testEnv({
+        AUTH_DISABLED: 'true',
+        RATE_LIMIT_MAX: '2',
+        RATE_LIMIT_WINDOW: '1 minute',
+      }),
+      osrm: stubOsrm(),
+    });
+
+    const url = `/api/v1/route?origin=${ORIGIN}&destination=${DESTINATION}`;
+
+    const a1 = await app.inject({ method: 'GET', url, remoteAddress: '10.0.0.1' });
+    const a2 = await app.inject({ method: 'GET', url, remoteAddress: '10.0.0.1' });
+    expect(a1.statusCode).toBe(200);
+    expect(a2.statusCode).toBe(200);
+
+    const b1 = await app.inject({ method: 'GET', url, remoteAddress: '10.0.0.2' });
+    expect(b1.statusCode).toBe(200);
+
+    const a3 = await app.inject({ method: 'GET', url, remoteAddress: '10.0.0.1' });
+    expect(a3.statusCode).toBe(429);
+    expect(a3.json().code).toBe('RATE_LIMITED');
+  });
 });

@@ -1,4 +1,5 @@
 import { loadEnv, type AppEnv } from '../src/config/env.js';
+import type { FirebaseAuthClient, FirebaseAuthResult } from '../src/services/firebaseAuthService.js';
 import type { OsrmClient, RouteResult } from '../src/services/osrmService.js';
 
 export function testEnv(overrides: Record<string, string> = {}): AppEnv {
@@ -7,6 +8,7 @@ export function testEnv(overrides: Record<string, string> = {}): AppEnv {
     LOG_LEVEL: 'silent',
     AUTH_ISSUER_URL: 'https://securetoken.google.com/test-project',
     FIREBASE_PROJECT_ID: 'test-project',
+    FIREBASE_API_KEY: 'test-api-key',
     AUTH_DISABLED: 'true',
     OSRM_URL: 'http://osrm.test:5000',
     DEFAULT_PROFILE: 'motorcycle',
@@ -35,6 +37,25 @@ export function stubOsrm(result?: Partial<RouteResult>): OsrmClient {
         geometry: sampleGeometry,
         ...result,
       };
+    },
+  };
+}
+
+export function stubFirebaseAuth(result?: Partial<FirebaseAuthResult>): FirebaseAuthClient {
+  const response: FirebaseAuthResult = {
+    uid: 'user-123',
+    token: 'id-token',
+    refreshToken: 'refresh-token',
+    expiresIn: '3600',
+    ...result,
+  };
+
+  return {
+    async signUp() {
+      return response;
+    },
+    async signIn() {
+      return response;
     },
   };
 }

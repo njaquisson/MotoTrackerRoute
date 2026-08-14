@@ -119,7 +119,7 @@ No `.env`:
 AUTH_DISABLED=true
 ```
 
-Com isso, todas as rotas ficam abertas e o rate limit passa a usar o IP como chave.
+Com isso, todas as rotas ficam abertas e o rate limit passa a usar o **IP** como chave (em vez do `uid`). A flag é **recusada em produção**: com `NODE_ENV=production`, o servidor não sobe com `AUTH_DISABLED=true`.
 
 ## Variáveis de ambiente
 
@@ -138,7 +138,8 @@ Ver `.env.example`. Todas validadas por `zod` no boot — o servidor não sobe c
 | `DEFAULT_PROFILE` | `motorcycle` | Perfil usado na URL do OSRM |
 | `AUTH_ISSUER_URL` | — | **obrigatória** — issuer do JWT Firebase |
 | `FIREBASE_PROJECT_ID` | derivado do issuer | Usado como `audience` do JWT |
-| `AUTH_DISABLED` | `false` | Desativa validação JWT (só dev/testes) |
+| `FIREBASE_API_KEY` | — | **obrigatória** — Web API Key (pública) p/ signup/login |
+| `AUTH_DISABLED` | `false` | Desativa validação JWT (só dev/testes; recusado em `production`) |
 | `RATE_LIMIT_MAX` | `60` | Máximo de requisições por janela |
 | `RATE_LIMIT_WINDOW` | `1 minute` | Janela do rate limit |
 
@@ -155,17 +156,55 @@ A URL interna montada para o OSRM:
 ### `GET /health` — público
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:8888/health
 ```
 
 ```json
 { "status": "ok", "service": "motor-route", "profile": "motorcycle" }
 ```
 
+### Autenticação (pública) — obter o token
+
+`POST /api/v1/auth/signup` — cria conta e retorna um **ID token** Firebase:
+
+```bash
+curl -X POST http://localhost:8888/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"rider@example.com","password":"secret123"}'
+```
+
+`POST /api/v1/auth/login` — autentica e retorna um **ID token** Firebase:
+
+```bash
+curl -X POST http://localhost:8888/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"rider@example.com","password":"secret123"}'
+```
+
+Resposta (ambos):
+
+```json
+{
+  "token": "eyJhbGciOi...",
+  "refreshToken": "1//0g...",
+  "expiresIn": "3600",
+  "uid": "abc123"
+}
+```
+
+| Campo | Descrição |
+| --- | --- |
+| `token` | ID token Firebase — use no header `Authorization: Bearer` |
+| `refreshToken` | Para renovar o token via SDK/REST |
+| `expiresIn` | Validade do token em segundos |
+| `uid` | Identificador do usuário |
+
+Essas rotas usam a **Web API Key** (`FIREBASE_API_KEY`) e são **públicas** (sem JWT). Erros comuns: `EMAIL_EXISTS` (409), `INVALID_CREDENTIALS` (401), `INVALID_EMAIL` (400), `WEAK_PASSWORD` (400), `TOO_MANY_ATTEMPTS` (429).
+
 ### `GET /api/v1/route?origin={lat,lng}&destination={lat,lng}` — autenticado
 
 ```bash
-curl "http://localhost:3000/api/v1/route?origin=-29.7608,-50.0200&destination=-30.0346,-51.2177" \
+curl "http://localhost:8888/api/v1/route?origin=-29.7608,-50.0200&destination=-30.0346,-51.2177" \
   -H "Authorization: Bearer <FIREBASE_ID_TOKEN>"
 ```
 
@@ -195,13 +234,74 @@ Toda resposta de erro segue o formato `{ error, code, message }`:
 | --- | --- | --- |
 | 400 | `INVALID_QUERY` | `origin` ou `destination` ausentes |
 | 400 | `INVALID_COORDINATES` | Coordenadas malformadas ou fora do range (`lat` ±90, `lng` ±180) |
+| 400 | `INVALID_BODY` | Body de signup/login inválido |
+| 400 | `INVALID_EMAIL` | Email inválido |
+| 400 | `WEAK_PASSWORD` | Senha com menos de 6 caracteres |
 | 401 | `MISSING_TOKEN` | Cabeçalho `Authorization` ausente |
 | 401 | `INVALID_TOKEN` | JWT inválido/malformado |
 | 401 | `TOKEN_EXPIRED` | JWT expirado |
+| 401 | `INVALID_CREDENTIALS` | Email ou senha incorretos no login |
+| 403 | `USER_DISABLED` | Conta de usuário desativada |
 | 404 | `ROUTE_NOT_FOUND` | OSRM não encontrou rota entre os pontos |
+| 409 | `EMAIL_EXISTS` | Email já cadastrado no signup |
 | 429 | `RATE_LIMITED` | Limite de requisições excedido |
+| 429 | `TOO_MANY_ATTEMPTS` | Firebase bloqueou tentativas repetidas |
 | 502 | `OSRM_UNAVAILABLE` | OSRM inacessível ou resposta inválida |
+| 502 | `FIREBASE_UNAVAILABLE` | Firebase Auth inacessível ou resposta inválida |
 | 500 | `INTERNAL_ERROR` | Erro inesperado |
+
+### Testando o fluxo completo (ponta a ponta)
+
+Fluxo de teste com a API em `http://localhost:8888` e `AUTH_DISABLED=false`:
+
+**1. Signup (cria conta)**
+
+```bash
+curl -X POST http://localhost:8888/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"novo.motoqueiro@example.com","password":"secret123"}'
+```
+
+**2. Login (obter token)**
+
+```bash
+curl -X POST http://localhost:8888/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"rider@example.com","password":"secret123"}'
+```
+
+**3. Salvar o token para os próximos testes**
+
+```bash
+export TOKEN="<Token retornado no passo 2>"
+```
+
+Para os testes 4, 5 e 6 valerem (auth de verdade), reinicie a API antes com:
+
+```bash
+# Ctrl+C na API, depois:
+AUTH_DISABLED=false PORT=8888 node --import tsx src/server.ts
+```
+
+**4. Rota SEM token → espera `401 MISSING_TOKEN`**
+
+```bash
+curl "http://localhost:8888/api/v1/route?origin=-29.7608,-50.0200&destination=-30.0346,-51.2177"
+```
+
+**5. Rota com token inválido → espera `401 INVALID_TOKEN`**
+
+```bash
+curl "http://localhost:8888/api/v1/route?origin=-29.7608,-50.0200&destination=-30.0346,-51.2177" \
+  -H "Authorization: Bearer abcdef"
+```
+
+**6. Rota com token válido → espera `200` com distância/duração/geometry**
+
+```bash
+curl "http://localhost:8888/api/v1/route?origin=-29.7608,-50.0200&destination=-30.0346,-51.2177" \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ## Testes
 
@@ -230,10 +330,16 @@ motor-route/
 │   ├── app.ts                    # composição do Fastify (plugins, hooks, rotas)
 │   ├── server.ts                 # bootstrap + graceful shutdown
 │   ├── config/env.ts             # schemas zod + loading do ambiente
-│   ├── controllers/routeController.ts
+│   ├── controllers/
+│   │   ├── routeController.ts    # GET /api/v1/route
+│   │   └── authController.ts     # POST /api/v1/auth/signup + /login
 │   ├── middlewares/auth.ts       # verificação JWT RS256 (JWKS)
-│   ├── routes/route.ts           # GET /api/v1/route (schema JSON)
-│   ├── services/osrmService.ts   # cliente HTTP do OSRM + mapping da resposta
+│   ├── routes/
+│   │   ├── route.ts              # rota protegida de roteamento
+│   │   └── auth.ts               # rotas públicas de autenticação
+│   ├── services/
+│   │   ├── osrmService.ts        # cliente HTTP do OSRM + mapping da resposta
+│   │   └── firebaseAuthService.ts# cliente Identity Toolkit (signup/login)
 │   └── utils/                    # coordinates, errors, etc.
 ├── osrm/profiles/motorcycle.lua  # perfil customizado do OSRM
 ├── scripts/prepare-osrm.sh       # alternativa manual ao compose
