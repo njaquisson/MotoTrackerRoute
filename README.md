@@ -2,7 +2,7 @@
 
 Microsserviço de roteamento do **MotoTracker**. Calcula trajetos A → B para motociclistas via **OSRM** (Open Source Routing Machine) com um perfil `motorcycle` próprio, **sem depender de APIs de mapa de terceiros** (Google Maps, Mapbox, etc.).
 
-O motor de roteamento roda localmente (Docker), o que garante privacidade dos dados, custo zero por requisição e baixa latência — o mapa coberto é o estado do **Rio Grande do Sul**.
+O motor de roteamento roda localmente (Docker), o que garante privacidade dos dados, custo zero por requisição e baixa latência — o mapa coberto é o **Brasil inteiro** (dados OSM).
 
 ## Destaques técnicos
 
@@ -20,7 +20,7 @@ O motor de roteamento roda localmente (Docker), o que garante privacidade dos da
 | Auth | Firebase Auth — JWT RS256 via JWKS (`jose`) |
 | Rate limit | `@fastify/rate-limit` (por `uid`, fallback IP) |
 | Motor de rota | `osrm/osrm-backend` + perfil `osrm/profiles/motorcycle.lua` |
-| Mapa | Rio Grande do Sul (OSM.fr, ~158 MB) |
+| Mapa | Brasil (Geofabrik, ~1,9 GB — configurável via `OSRM_EXTRACT`) |
 | Testes | Vitest (unitário + integração) |
 | Infra | Docker Compose + multi-stage Dockerfile |
 
@@ -66,7 +66,7 @@ docker --version
 docker compose version
 ```
 
-> A primeira preparação do grafo do RS baixa ~158 MB e exige **~4 GB de RAM** por alguns minutos. Nas execuções seguintes o volume Docker `osrm-data` é reutilizado.
+> A primeira preparação do grafo do **Brasil** baixa ~1,9 GB (Geofabrik `brazil-latest.osm.pbf`) e exige **~20 GB de RAM** por ~1–2 h. Os dados ficam em `OSRM_DATA_DIR` (bind mount no host — veja abaixo) e são reutilizados nas execuções seguintes.
 
 ## Instalação
 
@@ -135,6 +135,9 @@ Ver `.env.example`. Todas validadas por `zod` no boot — o servidor não sobe c
 | `LOG_LEVEL` | `info` | Nível de log do Pino |
 | `OSRM_URL` | `http://localhost:5000` | URL base do OSRM |
 | `OSRM_TIMEOUT_MS` | `15000` | Timeout das chamadas internas ao OSRM |
+| `OSRM_DATA_DIR` | `./.osrm-data` | Pasta no **host** onde o PBF e o grafo `.osrm` são baixados/gravados (bind mount em `/data`) |
+| `OSRM_EXTRACT` | `brazil-latest` | Base do arquivo: espera `<EXTRACT>.osm.pbf` e gera `<EXTRACT>.osrm` |
+| `OSRM_PBF_URL` | Geofabrik Brasil | URL de download do extrato OSM |
 | `PARAM_OVERVIEW` | `full` | `full` \| `simplified` \| `false` |
 | `PARAM_GEOMETRIES` | `geojson` | `geojson` \| `polyline` \| `polyline6` |
 | `DEFAULT_PROFILE` | `motorcycle` | Perfil usado na URL do OSRM |
@@ -144,6 +147,14 @@ Ver `.env.example`. Todas validadas por `zod` no boot — o servidor não sobe c
 | `AUTH_DISABLED` | `false` | Desativa validação JWT (só dev/testes; recusado em `production`) |
 | `RATE_LIMIT_MAX` | `60` | Máximo de requisições por janela |
 | `RATE_LIMIT_WINDOW` | `1 minute` | Janela do rate limit |
+
+**Dados do mapa (OSRM):** o compose monta `OSRM_DATA_DIR` em `/data` nos 3 serviços de OSRM (`osrm-download` → `osrm-prepare` → `osrm-routed`). Como é um **bind mount** no host, `docker compose down -v` **não apaga** o grafo. Para trocar a região, mude `OSRM_EXTRACT` + `OSRM_PBF_URL` no `.env`:
+
+```env
+# Ex.: só o Rio Grande do Sul (openstreetmap.fr)
+OSRM_EXTRACT=rio-grande-do-sul-latest
+OSRM_PBF_URL=https://download.openstreetmap.fr/extracts/south-america/brazil/south/rio-grande-do-sul-latest.osm.pbf
+```
 
 A URL interna montada para o OSRM:
 

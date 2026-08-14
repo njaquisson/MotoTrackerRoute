@@ -3,19 +3,19 @@ services:
     image: curlimages/curl:8.11.1
     user: "root"
     volumes:
-      - osrm-data:/data
+      - ${OSRM_DATA_DIR}:/data
     command:
       - sh
       - -c
       - |
         set -eu
-        TARGET=/data/rio-grande-do-sul-latest.osm.pbf
-        URL=https://download.openstreetmap.fr/extracts/south-america/brazil/south/rio-grande-do-sul-latest.osm.pbf
+        TARGET=/data/${OSRM_EXTRACT}.osm.pbf
+        URL=${OSRM_PBF_URL}
         if [ -f "$$TARGET" ]; then
           echo "PBF already present: $$TARGET"
           exit 0
         fi
-        echo "Downloading Rio Grande do Sul OSM extract (~158MB)..."
+        echo "Downloading OSM extract ($$URL)..."
         curl -fL --retry 5 --retry-all-errors --retry-delay 5 -o "$$TARGET" "$$URL"
         echo "Download complete"
 
@@ -25,28 +25,28 @@ services:
       osrm-download:
         condition: service_completed_successfully
     volumes:
-      - osrm-data:/data
+      - ${OSRM_DATA_DIR}:/data
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -eu
-        PBF=/data/rio-grande-do-sul-latest.osm.pbf
-        GRAPH=/data/rio-grande-do-sul-latest.osrm
+        PBF=/data/${OSRM_EXTRACT}.osm.pbf
+        GRAPH=/data/${OSRM_EXTRACT}.osrm
         PROFILE_DIR=/data/profiles
         PROFILE=$$PROFILE_DIR/motorcycle.lua
-        
-        if [ -f /data/rio-grande-do-sul-latest.osrm.partition ]; then
+
+        if [ -f "$$GRAPH.partition" ]; then
           echo "OSRM graph already prepared"
           exit 0
         fi
-        
+
         echo "Criando um perfil de moto confiavel a partir do oficial..."
         mkdir -p $$PROFILE_DIR
         # Copia todos os perfis e bibliotecas nativas do OSRM para o volume
         cp -r /opt/* $$PROFILE_DIR/
         # Cria o motorcycle.lua a partir do car.lua oficial
         mv $$PROFILE_DIR/car.lua $$PROFILE
-        
+
         echo "Extracting motorcycle graph from $$PBF"
         osrm-extract -p $$PROFILE "$$PBF"
         echo "Partitioning..."
@@ -64,8 +64,8 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - osrm-data:/data
-    command: osrm-routed --algorithm mld --ip 0.0.0.0 --port 5000 /data/rio-grande-do-sul-latest.osrm
+      - ${OSRM_DATA_DIR}:/data
+    command: osrm-routed --algorithm mld --ip 0.0.0.0 --port 5000 /data/${OSRM_EXTRACT}.osrm
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1"]
       interval: 15s
@@ -89,6 +89,3 @@ services:
       HOST: 0.0.0.0
       OSRM_URL: http://osrm:5000
       DEFAULT_PROFILE: motorcycle
-
-volumes:
-  osrm-data:  

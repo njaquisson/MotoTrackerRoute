@@ -2,7 +2,7 @@
 
 Aplicação **React + Vite + Leaflet** que consome a API de roteamento [`GET /api/v1/route`](../../README.md#get-apiv1routeoriginlatlngdestinationlatlng--autenticado) e desenha a geometria da rota no mapa.
 
-É o **cliente de teste** do MotorRoute: serve para validar o contrato da API e visualizar o resultado do perfil `motorcycle` do OSRM (mapa: Rio Grande do Sul).
+É o **cliente de teste** do MotorRoute: serve para validar o contrato da API e visualizar o resultado do perfil `motorcycle` do OSRM (mapa: Brasil; rota de exemplo no RS).
 
 ## Stack
 
