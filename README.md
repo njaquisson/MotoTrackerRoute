@@ -91,13 +91,13 @@ FIREBASE_PROJECT_ID=<SEU_PROJECT_ID>
 
 ## Como rodar
 
-### Opção A — Stack completa com Docker (mais simples)
+### Opção A — Stack completa com Docker (recomendado)
 
-Sobe **API + OSRM** juntos. A API compila e roda dentro do container. Na **primeira vez**, o compose baixa o PBF e prepara o grafo antes de subir o servidor — **demora de 1 a 2 h** (veja [Dados do mapa (PBF + grafo OSRM)](#dados-do-mapa-pbf--grafo-osrm)):
+Sobe **API + OSRM** juntos — a API compila e roda **dentro do container**, lendo o `.env` do projeto (não é preciso iniciar a API na mão). Na **primeira vez**, o compose baixa o PBF e prepara o grafo antes de subir o servidor — **demora de 1 a 2 h** (veja [Dados do mapa (PBF + grafo OSRM)](#dados-do-mapa-pbf--grafo-osrm)):
 
 ```bash
-docker compose up -d --build
-docker compose logs -f osrm-prepare   # acompanha download + extração
+docker compose up -d          # na 1ª vez adicione --build
+docker compose logs -f osrm-prepare   # 1ª vez: acompanha download + extração
 docker compose ps                      # aguarde osrm "Up (healthy)"
 ```
 
@@ -105,17 +105,21 @@ docker compose ps                      # aguarde osrm "Up (healthy)"
 - Health check: `curl http://localhost:8888/health`
 - OSRM: `http://127.0.0.1:5000` (publicado **apenas** em localhost, rede interna)
 
-### Opção B — API local + OSRM no Docker (desenvolvimento)
+> Depois de um **reboot**, basta repetir `docker compose up -d` — o PBF e o grafo já estão no host, os serviços de preparação saem imediatamente e apenas a API + OSRM sobem.
+
+### Opção B — API local com `tsx` (dev) + OSRM no Docker
+
+Alternativa para quem quer **hot-reload** do código da API sem rebuildar o container:
 
 ```bash
-# 1. Sobe o OSRM (download + extract/partition/customize na 1ª vez)
-docker compose up osrm
+# 1. Sobe só o OSRM (e dependências de prepare)
+docker compose up -d osrm
 
 # 2. API em modo dev (tsx watch, aponta para http://localhost:5000)
-npm run dev
+AUTH_DISABLED=false PORT=8888 npm run dev
 ```
 
-> Na 1ª vez, `docker compose up osrm` **baixa o PBF e prepara o grafo** (1–2 h); nas demais, sobe o servidor em segundos.
+> Na 1ª vez, `docker compose up -d osrm` **baixa o PBF e prepara o grafo** (1–2 h); nas demais, sobe o servidor em segundos.
 
 ### Sem Firebase (desenvolvimento/testes)
 
@@ -359,11 +363,10 @@ curl -X POST http://localhost:8888/api/v1/auth/login \
 export TOKEN="<Token retornado no passo 2>"
 ```
 
-Para os testes 4, 5 e 6 valerem (auth de verdade), reinicie a API antes com:
+Para os testes 4, 5 e 6 valerem (auth de verdade), a API precisa rodar com `AUTH_DISABLED=false` (valor padrão do `.env`). Com a API no Docker, garanta que o serviço `api` está no ar:
 
 ```bash
-# Ctrl+C na API, depois:
-AUTH_DISABLED=false PORT=8888 node --import tsx src/server.ts
+docker compose up -d api
 ```
 
 **4. Rota SEM token → espera `401 MISSING_TOKEN`**
@@ -448,10 +451,10 @@ O OSRM oficial não inclui um perfil de moto. `osrm/profiles/motorcycle.lua` der
 Em `examples/web` há um app **React + Vite + Leaflet** que consome a API e desenha a geometria no mapa:
 
 ```bash
-# API na porta 8888 com auth desativada
-AUTH_DISABLED=true PORT=8888 npm run dev
+# 1. API de rotas via Docker (porta 8888, auth ativa)
+docker compose up -d api
 
-# Frontend (outro terminal)
+# 2. Frontend (outro terminal)
 cd examples/web
 npm install
 npm run dev

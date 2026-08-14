@@ -13,10 +13,13 @@ O Cloudflare Tunnel **não hospeda** a API. Ele só cria um endereço público q
 
 ```bash
 cd ~/Documentos/Development/MotorRouter/motor-route
-AUTH_DISABLED=true PORT=8888 npm run dev
+# Desliga o JWT para testes via túnel (altere AUTH_DISABLED=true no .env)
+docker compose up -d api
 ```
 
-Deixe esse terminal aberto.
+> O túnel precisa acessar `localhost:8888`; o container `api` já publica nessa porta (`docker-compose.yml`). Depois de mudar `AUTH_DISABLED` no `.env`, recrie o container: `docker compose up -d --force-recreate api`.
+
+Deixe o terminal aberto (se o container parar, o endereço público para de responder).
 
 ---
 
@@ -141,7 +144,7 @@ Três processos ao mesmo tempo:
 
 | Terminal | Comando | Função |
 | --- | --- | --- |
-| 1 | `AUTH_DISABLED=true PORT=8888 npm run dev` | API local |
+| 1 | `docker compose up -d api` (na raiz do repo) | API local |
 | 2 | `cloudflared tunnel --url http://localhost:8888` | Túnel HTTPS |
 | 3 | `curl` / browser / app | Chamadas no link `.trycloudflare.com` |
 

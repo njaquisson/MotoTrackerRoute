@@ -35,7 +35,10 @@ services:
         PROFILE_DIR=/data/profiles
         PROFILE=$$PROFILE_DIR/motorcycle.lua
 
-        if [ -f "$$GRAPH.partition" ]; then
+        # Só considera o grafo pronto se o pipeline inteiro terminou
+        # (partition + customize para o algoritmo MLD). O .osrm.partition
+        # sozinho não basta: sem o .osrm.cell_metrics o osrm-routed falha.
+        if [ -f "$$GRAPH.partition" ] && [ -f "$$GRAPH.cell_metrics" ]; then
           echo "OSRM graph already prepared"
           exit 0
         fi

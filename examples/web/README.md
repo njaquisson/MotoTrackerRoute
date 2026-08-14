@@ -30,13 +30,13 @@ A API e o frontend rodam em **paralelo**, em terminais separados.
 
 ### 1. API na porta `8888`
 
-A API precisa estar acessível em `http://127.0.0.1:8888` (padrão esperado pelo proxy do Vite). Na raiz do repositório:
+A API precisa estar acessível em `http://127.0.0.1:8888` (padrão esperado pelo proxy do Vite). Rode o serviço `api` do Docker Compose a partir da raiz do repositório (ele também sobe o OSRM):
 
 ```bash
-AUTH_DISABLED=false PORT=8888 npm run dev
+docker compose up -d api
 ```
 
-> `AUTH_DISABLED=false` ativa o JWT — o frontend envia o token obtido no login (`Authorization: Bearer`).
+> O `.env` do projeto já define `PORT=8888` e `AUTH_DISABLED=false` — o JWT fica ativo e o frontend envia o token obtido no login (`Authorization: Bearer`).
 
 ### 2. Frontend na porta `5173`
 
@@ -46,6 +46,8 @@ npm run dev
 ```
 
 Abra `http://localhost:5173`.
+
+![Web API test](src/assets/web-app.png)
 
 > **Problema de `vite: not found`?** Se `npm run dev` falhar com `sh: 1: vite: not found` (binário fora do PATH), execute diretamente pelo Node:
 > ```bash
