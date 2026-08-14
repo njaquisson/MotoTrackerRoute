@@ -33,19 +33,21 @@ O motor de roteamento roda localmente (Docker), o que garante privacidade dos da
 └──────────────────────┬───────────────────────┘
                        │ GET /api/v1/route
 ┌──────────────────────▼───────────────────────┐
-│ API — Fastify (porta 3000)                   │
+│ API — Fastify (porta 8888)                   │
 │  ├ helmet · CORS origin=false · sensible     │
 │  ├ rate-limit (por uid / IP)                 │
 │  ├ Firebase Auth — JWT RS256 (JWKS)          │
 │  └ zod (validação de entrada/config)         │
 └──────────────────────┬───────────────────────┘
-                       │ HTTP interno (rede docker)
+                       │ HTTP (rede docker)
 ┌──────────────────────▼───────────────────────┐
 │ OSRM backend (porta 5000, só 127.0.0.1)      │
 │  GET /route/v1/motorcycle/{lng1},{lat1};…    │
 │  perfil: osrm/profiles/motorcycle.lua        │
 └──────────────────────────────────────────────┘
 ```
+
+> Porta da API configurável via `PORT` (default `3000`; dev/testes usa `8888`).
 
 ## Pré-requisitos (Linux)
 

@@ -60,7 +60,7 @@ O Vite faz proxy de todas as chamadas a `/api` para a API (`vite.config.ts`). Is
 - Para apontar para outra porta:
 
 ```bash
-API_PROXY_TARGET=http://127.0.0.1:3000 node ./node_modules/vite/bin/vite.js
+API_PROXY_TARGET=http://127.0.0.1:9999 node ./node_modules/vite/bin/vite.js
 ```
 
 ## Uso
