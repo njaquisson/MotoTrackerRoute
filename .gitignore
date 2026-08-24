@@ -9,6 +9,10 @@ data/
 *.osrm*
 osrm/data/
 
+# Python
+__pycache__/
+*.pyc
+
 # Secrets / credentials — never commit
 *.pem
 *.key
